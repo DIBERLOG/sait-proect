@@ -14,6 +14,8 @@ type Joke = {
   punchline: string
 }
 
+type SidebarView = 'home' | 'trends' | 'subscriptions'
+
 const usersApi = 'https://670cdcf87e5a228ec1d1adcf.mockapi.io/users'
 const jokeApi = 'https://official-joke-api.appspot.com/random_joke'
 
@@ -41,9 +43,33 @@ const form = reactive({
   avatar_url: fallbackAvatar
 })
 
+const activeSidebarView = ref<SidebarView>('home')
 const isSending = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+
+const sidebarItems: { key: SidebarView; icon: string; label: string }[] = [
+  { key: 'home', icon: '🏠', label: 'Главная' },
+  { key: 'trends', icon: '🔥', label: 'Тренды' },
+  { key: 'subscriptions', icon: '▶️', label: 'Подписки' }
+]
+
+const trendingPosts = computed(() => {
+  return visiblePosts.value
+    .map((post, index) => ({
+      ...post,
+      rating: visiblePosts.value.length - index + 10
+    }))
+    .slice(0, 4)
+})
+
+const subscriptions = computed(() => {
+  return users.value?.filter((user) => user.name || user.username).slice(0, 5) || []
+})
+
+function selectSidebarView(view: SidebarView) {
+  activeSidebarView.value = view
+}
 
 async function createUser() {
   errorMessage.value = ''
@@ -90,21 +116,20 @@ async function createUser() {
         <aside class="hidden w-80 flex-col layout-content-container md:flex">
           <div class="flex h-full min-h-[700px] flex-col justify-between bg-white p-4">
             <div class="flex flex-col gap-2">
-              <div class="flex items-center gap-3 rounded-xl bg-[#f0f2f4] px-3 py-2">
-                <span class="text-2xl">🏠</span>
-                <p class="text-sm font-medium text-[#111418]">Главная</p>
-              </div>
-              <div class="flex items-center gap-3 px-3 py-2">
-                <span class="text-2xl">🔥</span>
-                <p class="text-sm font-medium text-[#111418]">Тренды</p>
-              </div>
-              <div class="flex items-center gap-3 px-3 py-2">
-                <span class="text-2xl">▶️</span>
-                <p class="text-sm font-medium text-[#111418]">Подписки</p>
-              </div>
+              <button
+                v-for="item in sidebarItems"
+                :key="item.key"
+                type="button"
+                class="flex items-center gap-3 rounded-xl px-3 py-2 text-left transition hover:bg-[#f0f2f4] dark:hover:bg-white/10"
+                :class="activeSidebarView === item.key ? 'bg-[#f0f2f4] dark:bg-white/10' : ''"
+                @click="selectSidebarView(item.key)"
+              >
+                <span class="text-2xl">{{ item.icon }}</span>
+                <span class="text-sm font-medium text-[#111418] dark:text-white">{{ item.label }}</span>
+              </button>
               <NuxtLink to="/admin" class="flex items-center gap-3 px-3 py-2">
                 <span class="text-2xl">🛠️</span>
-                <p class="text-sm font-medium text-[#111418]">Админ-панель</p>
+                <p class="text-sm font-medium text-[#111418] dark:text-white">Админ-панель</p>
               </NuxtLink>
             </div>
           </div>
@@ -182,7 +207,45 @@ async function createUser() {
             </UCard>
           </section>
 
-          <section id="posts" class="flex flex-col gap-3 px-4 py-3">
+          <section v-if="activeSidebarView === 'trends'" class="px-4 py-3">
+            <UCard>
+              <template #header>
+                <h2 class="text-xl font-bold">Тренды</h2>
+              </template>
+
+              <div class="grid gap-3">
+                <article v-for="post in trendingPosts" :key="post.id" class="rounded-xl border border-slate-200 p-4 dark:border-white/20">
+                  <div class="flex items-center justify-between gap-3">
+                    <h3 class="font-bold text-[#111418] dark:text-white">{{ post.name }}</h3>
+                    <span class="rounded-full bg-black px-3 py-1 text-sm font-black text-white dark:bg-white dark:text-black">
+                      🔥 {{ post.rating }}
+                    </span>
+                  </div>
+                  <p class="mt-2 text-sm text-[#637588] dark:text-white/70">{{ post.message }}</p>
+                </article>
+              </div>
+            </UCard>
+          </section>
+
+          <section v-else-if="activeSidebarView === 'subscriptions'" class="px-4 py-3">
+            <UCard>
+              <template #header>
+                <h2 class="text-xl font-bold">Подписки</h2>
+              </template>
+
+              <div class="grid gap-3">
+                <article v-for="user in subscriptions" :key="user.id" class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-4 dark:border-white/20">
+                  <div>
+                    <h3 class="font-bold text-[#111418] dark:text-white">{{ user.name || user.username }}</h3>
+                    <p class="text-sm text-[#637588] dark:text-white/70">{{ user.message || 'Блогер из MockAPI' }}</p>
+                  </div>
+                  <UButton color="neutral" variant="soft">Открыть</UButton>
+                </article>
+              </div>
+            </UCard>
+          </section>
+
+          <section v-else id="posts" class="flex flex-col gap-3 px-4 py-3">
             <article
               v-for="post in visiblePosts"
               :key="post.id"
